@@ -1,4 +1,11 @@
 #!/usr/bin/make -f
 
+
 %:
-	dh $@
+	dh $@ --builddirectory=_build --buildsystem=golang
+
+execute_before_dh_auto_install:
+	rm _build/src/k8s.io/client-go/util/cert/testdata/README.md
+
+override_dh_auto_install:
+	dh_auto_install -- --no-binaries

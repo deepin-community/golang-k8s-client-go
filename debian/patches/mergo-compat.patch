@@ -1,0 +1,50 @@
+Description: mergo > 0.3.6 compatibility fix
+ Upstream is conservative about this and won't let client-go
+ use latest mergo version. Instead of keeping compatibility,
+ and rely on an old mergo version, this patch breaks corner
+ cases and allows test to pass with mergo in debian.
+Bug: https://github.com/kubernetes/kubernetes/pull/107837
+--- a/tools/clientcmd/loader.go
++++ b/tools/clientcmd/loader.go
+@@ -244,27 +244,14 @@
+ 		rules.Warner.Warn(MissingConfigError{Missing: missingList})
+ 	}
+ 
+-	// first merge all of our maps
+-	mapConfig := clientcmdapi.NewConfig()
+-
+-	for _, kubeconfig := range kubeconfigs {
+-		mergo.Merge(mapConfig, kubeconfig, mergo.WithOverride)
+-	}
+-
++	config := clientcmdapi.NewConfig()
+ 	// merge all of the struct values in the reverse order so that priority is given correctly
+ 	// errors are not added to the list the second time
+-	nonMapConfig := clientcmdapi.NewConfig()
+ 	for i := len(kubeconfigs) - 1; i >= 0; i-- {
+ 		kubeconfig := kubeconfigs[i]
+-		mergo.Merge(nonMapConfig, kubeconfig, mergo.WithOverride)
++		mergo.Merge(config, kubeconfig, mergo.WithSliceDeepCopy)
+ 	}
+-
+-	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
+-	// get the values we expect.
+-	config := clientcmdapi.NewConfig()
+-	mergo.Merge(config, mapConfig, mergo.WithOverride)
+-	mergo.Merge(config, nonMapConfig, mergo.WithOverride)
+-
++	
+ 	if rules.ResolvePaths() {
+ 		if err := ResolveLocalPaths(config); err != nil {
+ 			errlist = append(errlist, err)
+--- a/tools/clientcmd/loader_test.go
++++ b/tools/clientcmd/loader_test.go
+@@ -795,6 +795,8 @@
+ 	// apiVersion: v1
+ 	// clusters:
+ 	// - cluster:
++	//     disable-compression: true
++	//     insecure-skip-tls-verify: true
+ 	//     server: http://cow.org:8080
+ 	//   name: cow-cluster
+ 	// - cluster:
